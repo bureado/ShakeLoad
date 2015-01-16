@@ -4,7 +4,8 @@
   "description": "Load testing QuakeShake",
   "main": "app.js",
   "dependencies": {
-    "socket.io-client": "*"
+    "socket.io-client": "*",
+    "azure-storage": "*"
   },
   "homepage": "https://github.com/bureado/ShakeLoad"
 }

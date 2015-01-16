@@ -1,4 +1,5 @@
 var socket = require('socket.io-client')('http://qssub.cloudapp.net:8080');
+var azure = require('azure-storage');
 
 var pkct = 0;
 var packetStart;  // epoch in ms
@@ -8,11 +9,19 @@ var cnns = 0;
 var dscn = 0;
 var rcns = 0;
 
+var ppid = process.pid;
+
+var rate;
+
+var accountName = 'quakeshake';
+var accountKey = 'SUBWITHKEY';
+var azureTableName = 'shakeload';
+
 console.time("quake");
 
 socket.on("connect", function() {
 	++cnns;
-	console.log(process.pid + " socket connected");
+	console.log(ppid + " socket connected");
 
 }), socket.on("message", function(t) {
 	var e = JSON.parse(t);
@@ -30,35 +39,49 @@ socket.on("connect", function() {
 	if ( e.endtime > packetEnd ) {
 		packetEnd = e.endtime;
 	}
-/*
-	var msgl = t.toString().length;     // in bytes
-	var msgd = e.endtime - e.starttime; // in ms
-	var bptd = msgl / msgd;             // in bytes/ms
-
-	fullData[pkct] = { msgl: msgl, msgd: msgd, bptd: bptd };
-*/
 
 }), socket.on("disconnect", function() {
 	++dscn;
-	console.log(process.pid + " socket disconnected");
+	console.log(ppid + " socket disconnected");
 
 }), socket.on("reconnect", function() {
 	++rcns;
-	console.log(process.pid + " socket reconnected");
+	console.log(ppid + " socket reconnected");
 });
 
 process.on('SIGINT', function() {
 	console.log("Caught interrupt signal");
-	wrapup();
-	process.exit();
+
+	rate = pkct/((packetEnd-packetStart)/1e5);
+
+	var tableSvc = azure.createTableService(accountName, accountKey);
+	var entGen = azure.TableUtilities.entityGenerator;
+	var entity = {
+		PartitionKey: entGen.String('reports'),
+		RowKey: entGen.String(ppid.toString()),
+		packets: entGen.String(pkct),
+		rate: entGen.String(rate),
+		delta: entGen.String((packetEnd-packetStart)/1e5),
+		connects: entGen.String(cnns),
+		reconnects: entGen.String(rcns),
+		disconnects: entGen.String(dscn),
+		start: entGen.String(packetStart),
+		end: entGen.String(packetEnd)
+	};
+
+	tableSvc.insertEntity(azureTableName, entity, {echoContent: true}, function (error, result, response) {
+		if(result) {
+			console.log(result);
+			wrapup();
+			process.exit();
+		}
+	});
 });
 
 function wrapup() {
 	if (!pkct || !packetEnd || !packetStart) {
 		return;
 	}
-
-	var rate = pkct/((packetEnd-packetStart)/1e5);
 
 	console.log("Packets      " + pkct);
 	console.log("Rate         " + rate);
