@@ -1,0 +1,10 @@
+{
+  "name": "ShakeLoad",
+  "version": "0.0.1",
+  "description": "Load testing QuakeShake",
+  "main": "app.js",
+  "dependencies": {
+    "socket.io-client": "*"
+  },
+  "homepage": "https://github.com/bureado/ShakeLoad"
+}
