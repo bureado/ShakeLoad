@@ -6,7 +6,8 @@
   "dependencies": {
     "socket.io-client": "*",
     "azure-storage": "*",
-    "ws": "*"
+    "ws": "*",
+    "node-uuid": "*"
   },
   "homepage": "https://github.com/bureado/ShakeLoad"
 }

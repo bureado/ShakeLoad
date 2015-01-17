@@ -1,88 +1,92 @@
 var socket = require('socket.io-client')('http://QSub.trafficmanager.net');
 var azure = require('azure-storage');
+var uuid = require('node-uuid');
 
-var pkct = 0;
-var packetStart;  // epoch in ms
-var packetEnd = 0;    // epoch in ms
-var fullData = {}; // 1-indexed
-var cnns = 0;
-var dscn = 0;
-var rcns = 0;
+var ppid = uuid();
 
-var ppid = process.pid;
+// Global counters
+var packetCount = 0;
+var connectCount = 0;
+var disconnectCount = 0;
+var reconnectCount = 0;
 
-var rate;
+// Global time counters
+var timespanStart;
+var timespanEnd = 0;
+var processStart = new Date()/1e3;
 
+// Azure configuration
 var accountName = 'quakeshake';
-var accountKey = 'SUBWITHKEY';
+var accountKey = 'SUBKEY';
 var azureTableName = 'shakeload';
+var tableSvc, entGen;
 
 socket.on("connect", function() {
-	++cnns;
-	console.log(ppid + " socket connected");
+        ++connectCount;
+        tableSvc = azure.createTableService(accountName, accountKey);
+        entGen = azure.TableUtilities.entityGenerator;
+        console.log(ppid + " socket connected");
 
 });
 
-socket.on("message", function(t) {
-	console.log("RCV: " + t.length);
-	var e = JSON.parse(t);
+socket.on("message", function(message) {
+        console.log(ppid + " got message, len: " + message.length);
 
-	if (!e.data){
-		return;
-	}
+        var packet = JSON.parse(message);
+        if (!packet.data){
+                return;
+        } else {
+                packetCount++;
+        }
 
-	pkct++;
+        // Update my timespan
+        if (!timespanStart) {
+                timespanStart = packet.starttime;
+        }
+        if ( packet.endtime > timespanEnd ) {
+                timespanEnd = packet.endtime;
+        }
 
-	if (!packetStart) {
-		packetStart = e.starttime;
-	}
+        // Halftime report
+        if (!(packetCount%10)) {
+                timeDelta = new Date()/1e3 - processStart;
+                spanRate  = packetCount/((timespanEnd-timespanStart)/1e3);
+                deltaRate = packetCount/timeDelta;
 
-	if ( e.endtime > packetEnd ) {
-		packetEnd = e.endtime;
-	}
+                var entity = {
+                        PartitionKey: entGen.String('reports'),
+                        RowKey: entGen.String(ppid),
+                        processStart: entGen.String(processStart),
+                        packetCount: entGen.String(packetCount),
+                        timeDelta: entGen.String(timeDelta),
+                        spanRate: entGen.String(spanRate),
+                        deltaRate: entGen.String(deltaRate),
+                        connectCount: entGen.String(connectCount),
+                        reconnectCount: entGen.String(reconnectCount),
+                        disconnectCount: entGen.String(disconnectCount),
+                        timespanStart: entGen.String(timespanStart),
+                        timespanEnd: entGen.String(timespanEnd)
+                };
 
-	if ( packetEnd - packetStart > 10000 ) {
-		rate = pkct/((packetEnd-packetStart)/1e3);
-
-		var tableSvc = azure.createTableService(accountName, accountKey);
-		var entGen = azure.TableUtilities.entityGenerator;
-		var entity = {
-			PartitionKey: entGen.String('reports'),
-			RowKey: entGen.String(ppid.toString()),
-			packets: entGen.String(pkct),
-			rate: entGen.String(rate),
-			delta: entGen.String((packetEnd-packetStart)/1e3),
-			connects: entGen.String(cnns),
-			reconnects: entGen.String(rcns),
-			disconnects: entGen.String(dscn),
-			start: entGen.String(packetStart),
-			end: entGen.String(packetEnd)
-		};
-
-		tableSvc.insertEntity(azureTableName, entity, {echoContent: true}, function (error, result, response) {
-			if(result) {
-				wrapup();
-			}
-		});
-	}
+                tableSvc.insertOrReplaceEntity(azureTableName, entity, {echoContent: true}, function (error, result, response) {
+                        console.log(entity);
+                        if(result) {
+                                console.log(ppid + " data stored in Azure");
+                        }
+                });
+        }
 
 });
 
 socket.on("disconnect", function() {
-	++dscn;
-	console.log(ppid + " socket disconnected");
+        ++disconnectCount;
+        console.log(ppid + " socket disconnected");
 
 });
 
 socket.on("reconnect", function() {
-	++rcns;
-	console.log(ppid + " socket reconnected");
+        ++reconnectCount;
+        console.log(ppid + " socket reconnected");
 
 });
 
-function wrapup() {
-	console.log("Packets      " + pkct);
-	console.log("Rate         " + rate);
-	console.log("Duration     " + (packetEnd-packetStart)/1e3);
-
-}

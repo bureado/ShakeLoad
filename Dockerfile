@@ -8,7 +8,10 @@ RUN \
   cd /data/ShakeLoad && \
   npm install
 
+RUN\
+  cd /data/ShakeLoad && \
+  sed -i 's/SUBWITHKEY/your-key-here/' *.js
+
 WORKDIR /data/ShakeLoad
 
 CMD ["node", "/data/ShakeLoad/app.js"]
-
