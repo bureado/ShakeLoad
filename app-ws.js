@@ -1,5 +1,7 @@
-var socket = require('socket.io-client')('http://QSub.trafficmanager.net');
+var WebSocket = require('ws');
 var azure = require('azure-storage');
+
+var socket = new WebSocket('http://WSub.trafficmanager.net:8080');
 
 var pkct = 0;
 var packetStart;  // epoch in ms
@@ -17,7 +19,7 @@ var accountName = 'quakeshake';
 var accountKey = 'SUBWITHKEY';
 var azureTableName = 'shakeload';
 
-socket.on("connect", function() {
+socket.on("open", function() {
 	++cnns;
 	console.log(ppid + " socket connected");
 
@@ -33,6 +35,10 @@ socket.on("message", function(t) {
 
 	pkct++;
 
+	if(!(pkct%500)) {
+		console.log('.');
+	}
+
 	if (!packetStart) {
 		packetStart = e.starttime;
 	}
@@ -43,22 +49,12 @@ socket.on("message", function(t) {
 
 });
 
-socket.on("disconnect", function() {
+socket.on("close", function() {
 	++dscn;
 	console.log(ppid + " socket disconnected");
 
 });
 
-socket.on("reconnect", function() {
-	++rcns;
-	console.log(ppid + " socket reconnected");
-});
-
-socket.on("reconnect_failed", function() {
-	console.log(ppid + " socket failed reconnect");
-	wrapup();
-	process.exit();
-});
 
 process.on('SIGINT', function() {
 	console.log("Caught interrupt signal");
@@ -79,7 +75,6 @@ process.on('SIGINT', function() {
 		rate: entGen.String(rate),
 		delta: entGen.String((packetEnd-packetStart)/1e3),
 		connects: entGen.String(cnns),
-		reconnects: entGen.String(rcns),
 		disconnects: entGen.String(dscn),
 		start: entGen.String(packetStart),
 		end: entGen.String(packetEnd)
@@ -103,7 +98,6 @@ function wrapup() {
 	console.log("Rate         " + rate);
 	console.log("Duration     " + (packetEnd-packetStart)/1e3);
 	console.log("Connects     " + cnns);
-	console.log("Reconnects   " + rcns);
 	console.log("Disconnects  " + dscn);
 
 	console.log("Start packet " + packetStart);
