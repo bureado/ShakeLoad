@@ -41,6 +41,31 @@ socket.on("message", function(t) {
 		packetEnd = e.endtime;
 	}
 
+	if ( packetEnd - packetStart > 10000 ) {
+		rate = pkct/((packetEnd-packetStart)/1e3);
+
+		var tableSvc = azure.createTableService(accountName, accountKey);
+		var entGen = azure.TableUtilities.entityGenerator;
+		var entity = {
+			PartitionKey: entGen.String('reports'),
+			RowKey: entGen.String(ppid.toString()),
+			packets: entGen.String(pkct),
+			rate: entGen.String(rate),
+			delta: entGen.String((packetEnd-packetStart)/1e3),
+			connects: entGen.String(cnns),
+			reconnects: entGen.String(rcns),
+			disconnects: entGen.String(dscn),
+			start: entGen.String(packetStart),
+			end: entGen.String(packetEnd)
+		};
+
+		tableSvc.insertEntity(azureTableName, entity, {echoContent: true}, function (error, result, response) {
+			if(result) {
+				wrapup();
+			}
+		});
+	}
+
 });
 
 socket.on("disconnect", function() {
@@ -52,60 +77,12 @@ socket.on("disconnect", function() {
 socket.on("reconnect", function() {
 	++rcns;
 	console.log(ppid + " socket reconnected");
-});
 
-socket.on("reconnect_failed", function() {
-	console.log(ppid + " socket failed reconnect");
-	wrapup();
-	process.exit();
-});
-
-process.on('SIGINT', function() {
-	console.log("Caught interrupt signal");
-
-	if(!pkct) {
-		console.log("Never connected");
-		process.exit();
-	}
-
-	rate = pkct/((packetEnd-packetStart)/1e3);
-
-	var tableSvc = azure.createTableService(accountName, accountKey);
-	var entGen = azure.TableUtilities.entityGenerator;
-	var entity = {
-		PartitionKey: entGen.String('reports'),
-		RowKey: entGen.String(ppid.toString()),
-		packets: entGen.String(pkct),
-		rate: entGen.String(rate),
-		delta: entGen.String((packetEnd-packetStart)/1e3),
-		connects: entGen.String(cnns),
-		reconnects: entGen.String(rcns),
-		disconnects: entGen.String(dscn),
-		start: entGen.String(packetStart),
-		end: entGen.String(packetEnd)
-	};
-
-	tableSvc.insertEntity(azureTableName, entity, {echoContent: true}, function (error, result, response) {
-		if(result) {
-			console.log(result);
-			wrapup();
-			process.exit();
-		}
-	});
 });
 
 function wrapup() {
-	if (!pkct || !packetEnd || !packetStart) {
-		return;
-	}
-
 	console.log("Packets      " + pkct);
 	console.log("Rate         " + rate);
 	console.log("Duration     " + (packetEnd-packetStart)/1e3);
-	console.log("Connects     " + cnns);
-	console.log("Reconnects   " + rcns);
-	console.log("Disconnects  " + dscn);
 
-	console.log("Start packet " + packetStart);
-	console.log("Final packet " + packetEnd);
 }
