@@ -72,7 +72,7 @@ socket.on("message", function(message) {
                         connectCount: entGen.String(connectCount),
                         reconnectCount: entGen.String(reconnectCount),
                         disconnectCount: entGen.String(disconnectCount),
-			gapCount: entGen.String(gapCount),
+			gapCount: entGen.String(gapCounter),
                         timespanStart: entGen.String(timespanStart),
                         timespanEnd: entGen.String(timespanEnd)
                 };
