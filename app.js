@@ -15,6 +15,9 @@ var timespanStart;
 var timespanEnd = 0;
 var processStart = new Date()/1e3;
 
+// Timestamp tracking
+var timeline = {};
+
 // Azure configuration
 var accountName = 'quakeshake';
 var accountKey = 'SUBKEY';
@@ -46,9 +49,14 @@ socket.on("message", function(message) {
         if ( packet.endtime > timespanEnd ) {
                 timespanEnd = packet.endtime;
         }
+	if (packet.starttime - timeline[packet.sta] > 5) {
+		++gapCounter;
+		console.log("STA: " + packet.sta + " GAP: " + (packet.starttime-timeline[packet.sta]));
+	}
+	timeline[packet.sta] = packet.endtime;
 
         // Halftime report
-        if (!(packetCount%10)) {
+        if (!(packetCount%50)) {
                 timeDelta = new Date()/1e3 - processStart;
                 spanRate  = packetCount/((timespanEnd-timespanStart)/1e3);
                 deltaRate = packetCount/timeDelta;
@@ -64,6 +72,7 @@ socket.on("message", function(message) {
                         connectCount: entGen.String(connectCount),
                         reconnectCount: entGen.String(reconnectCount),
                         disconnectCount: entGen.String(disconnectCount),
+			gapCount: entGen.String(gapCount),
                         timespanStart: entGen.String(timespanStart),
                         timespanEnd: entGen.String(timespanEnd)
                 };
