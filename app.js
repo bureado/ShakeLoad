@@ -9,6 +9,7 @@ var packetCount = 0;
 var connectCount = 0;
 var disconnectCount = 0;
 var reconnectCount = 0;
+var gapCount = 0;
 
 // Global time counters
 var timespanStart;
@@ -50,7 +51,7 @@ socket.on("message", function(message) {
                 timespanEnd = packet.endtime;
         }
 	if (packet.starttime - timeline[packet.sta] > 5) {
-		++gapCounter;
+		++gapCount;
 		console.log("STA: " + packet.sta + " GAP: " + (packet.starttime-timeline[packet.sta]));
 	}
 	timeline[packet.sta] = packet.endtime;
@@ -72,7 +73,7 @@ socket.on("message", function(message) {
                         connectCount: entGen.String(connectCount),
                         reconnectCount: entGen.String(reconnectCount),
                         disconnectCount: entGen.String(disconnectCount),
-			gapCount: entGen.String(gapCounter),
+			gapCount: entGen.String(gapCount),
                         timespanStart: entGen.String(timespanStart),
                         timespanEnd: entGen.String(timespanEnd)
                 };
